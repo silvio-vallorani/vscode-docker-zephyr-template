@@ -1,108 +1,26 @@
-# CI Image (ci) 
-# -- only selected toolchains
 
-#FROM debian:11-slim
-FROM ubuntu:22.04
+FROM python:alpine3.19
 
-ARG UID=1000
-ARG GID=1000
-
-# Set default shell during Docker image build to bash
-SHELL ["/bin/bash", "-c"]
-
-# Set non-interactive frontend for apt-get to skip any user confirmations
-ENV DEBIAN_FRONTEND=noninteractive
+ARG USER=zephyr
+ARG WORKDIR=workspaces
+ARG HOST_ARCH=x86_64
+ARG TARGET=stm32
+ARG TOOLCHAIN=arm-zephyr-eabi
+ARG ZEPHYR_VERSION=3.3.0
+ARG ZSDK_VERSION=0.16.1
 
 # Install base packages
-RUN apt-get -y update && \
-	apt-get -y upgrade && \
-	apt-get install --no-install-recommends -y \
-		software-properties-common \
-		lsb-release \
-		autoconf \
-		automake \
-		bison \
-		build-essential \
-		ca-certificates \
-		cargo \
-		ccache \
-		chrpath \
-		cmake \
-		cpio \
-		device-tree-compiler \
-		dfu-util \
-		diffstat \
-		dos2unix \
-		doxygen \
-		file \
-		flex \
-		g++ \
-		gawk \
-		gcc \
-		gcovr \
-		git \
-		git-core \
-		gnupg \
-		gperf \
-		gtk-sharp2 \
-		help2man \
-		iproute2 \
-		lcov \
-		libcairo2-dev \
-		libglib2.0-dev \
-		libgtk2.0-0 \
-		liblocale-gettext-perl \
-		libncurses5-dev \
-		libpcap-dev \
-		libpopt0 \
-		libsdl1.2-dev \
-		libsdl2-dev \
-		libssl-dev \
-		libtool \
-		libtool-bin \
-		locales \
-		make \
-		net-tools \
-		ninja-build \
-		openssh-client \
-		parallel \
-		pkg-config \
-		python3-dev \
-		python3-pip \
-		python3-ply \
-		python3-setuptools \
-		python-is-python3 \
-		qemu \
-		rsync \
-		socat \
-		srecord \
-		sudo \
-		texinfo \
-		unzip \
-		valgrind \
-		wget \
-		ovmf \
-		xz-utils \
-		thrift-compiler
-
-# Install multi-lib gcc (x86 only)
-RUN if [ "${HOSTTYPE}" = "x86_64" ]; then \
-	apt-get install --no-install-recommends -y \
-		gcc-multilib \
-		g++-multilib \
-	; fi
-
-# Install i386 packages (x86 only)
-RUN if [ "${HOSTTYPE}" = "x86_64" ]; then \
-	dpkg --add-architecture i386 && \
-	apt-get -y update && \
-	apt-get -y upgrade && \
-	apt-get install --no-install-recommends -y \
-		libsdl2-dev:i386 \
-	; fi
+RUN apk add --update --no-cache \
+	bash \
+	sudo \
+	build-base \
+	pkgconfig cmake git \
+	cairo-dev cairo cairo-tools \
+	gobject-introspection-dev \
+	rust cargo
 
 # Initialise system locale
-RUN locale-gen en_US.UTF-8
+#RUN locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
@@ -118,88 +36,56 @@ RUN python3 -m pip install -U --no-cache-dir pip && \
 		pylint sh statistics west && \
 	pip3 check
 
-# Clean up stale packages
-RUN apt-get clean -y && \
-	apt-get autoremove --purge -y && \
-	rm -rf /var/lib/apt/lists/*
-
 # Create 'user' account
-RUN groupadd -g $GID -o user
+# https://wiki.alpinelinux.org/wiki/Setting_up_a_new_user
+RUN adduser -D $USER \
+    && echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$USER \
+    && chmod 0440 /etc/sudoers.d/$USER
 
-RUN useradd -u $UID -m -g user -G plugdev user \
-	&& echo 'user ALL = NOPASSWD: ALL' > /etc/sudoers.d/user \
-	&& chmod 0440 /etc/sudoers.d/user
-
-USER root
-
-
-
-
-### second stage
-
-
-
-ARG TARGET=stm32
-ARG TOOLCHAIN=arm-zephyr-eabi
-
-ARG ZEPHYR_VERSION=3.3.0
-ARG ZSDK_VERSION=0.16.1
-ARG WGET_ARGS="-q --show-progress --progress=bar:force:noscroll"
 
 # Install Zephyr SDK (minimal + toolchain + host tools)
 RUN mkdir -p /opt/toolchains && \
 	cd /opt/toolchains && \
-	wget ${WGET_ARGS} https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${ZSDK_VERSION}/zephyr-sdk-${ZSDK_VERSION}_linux-${HOSTTYPE}_minimal.tar.xz && \
-	tar xf zephyr-sdk-${ZSDK_VERSION}_linux-${HOSTTYPE}_minimal.tar.xz && \
-	rm zephyr-sdk-${ZSDK_VERSION}_linux-${HOSTTYPE}_minimal.tar.xz && \
+	wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${ZSDK_VERSION}/zephyr-sdk-${ZSDK_VERSION}_linux-${HOST_ARCH}_minimal.tar.xz && \
+	tar xf zephyr-sdk-${ZSDK_VERSION}_linux-${HOST_ARCH}_minimal.tar.xz && \
+	rm zephyr-sdk-${ZSDK_VERSION}_linux-${HOST_ARCH}_minimal.tar.xz && \
 	# toolchain
 	cd zephyr-sdk-${ZSDK_VERSION} && \
-	wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.1/toolchain_linux-x86_64_${TOOLCHAIN}.tar.xz && \
-    tar xvf toolchain_linux-x86_64_${TOOLCHAIN}.tar.xz && \
-    rm toolchain_linux-x86_64_${TOOLCHAIN}.tar.xz && \
+	wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.1/toolchain_linux-${HOST_ARCH}_${TOOLCHAIN}.tar.xz && \
+    tar xvf toolchain_linux-${HOST_ARCH}_${TOOLCHAIN}.tar.xz && \
+    rm toolchain_linux-${HOST_ARCH}_${TOOLCHAIN}.tar.xz && \
     # host tools
-    wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.1/hosttools_linux-x86_64.tar.xz && \
-    tar xvf hosttools_linux-x86_64.tar.xz && \
-    rm hosttools_linux-x86_64.tar.xz
+    wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.1/hosttools_linux-${HOST_ARCH}.tar.xz && \
+    tar xvf hosttools_linux-${HOST_ARCH}.tar.xz && \
+    rm hosttools_linux-${HOST_ARCH}.tar.xz
     # run it
     #./zephyr-sdk-${HOSTTYPE}-hosttools-standalone-0.9.sh
 
 
-# Clean up stale packages
-RUN apt-get clean -y && \
-	apt-get autoremove --purge -y && \
-	rm -rf /var/lib/apt/lists/*
-
 # Run the Zephyr SDK setup script as 'user' in order to ensure that the
 # `Zephyr-sdk` CMake package is located in the package registry under the
 # user's home directory.
-USER user
+USER $USER
 
-RUN sudo -E -- bash -c ' \
-	/opt/toolchains/zephyr-sdk-${ZSDK_VERSION}/setup.sh -c && \
-	chown -R user:user /home/user/.cmake \
-	'
+#RUN sudo -E -- /bin/sh -c \
+#	'/opt/toolchains/zephyr-sdk-${ZSDK_VERSION}/setup.sh -c && \
+#	chown -R $USER:$USER /home/$USER/.cmake'
+RUN sudo /opt/toolchains/zephyr-sdk-${ZSDK_VERSION}/setup.sh -c 
 
-WORKDIR /workdir
 RUN \
 	west init -m https://github.com/cooked/vscode-zephyr-template --mf .manifests/west-${TARGET}.yml && \
-    #west init -l manifest && \
     west update && \
     python3 -m pip install -r zephyr/scripts/requirements.txt
-
-RUN \
-	mkdir /workdir/project
-WORKDIR /workdir/project
-
+	
+WORKDIR /$WORKDIR
 
 # Set the locale
 ENV PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig
 ENV OVMF_FD_PATH=/usr/share/ovmf/OVMF.fd
-
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
-ENV XDG_CACHE_HOME=/workdir/.cache
+ENV XDG_CACHE_HOME=/$WORKDIR/.cache
 ENV ZEPHYR_TOOLCHAIN_VARIANT=zephyr
-ENV ZEPHYR_SDK_INSTALL_DIR=/workdir/zephyr-sdk
-ENV ZEPHYR_BASE=/workdir/zephyr
+ENV ZEPHYR_SDK_INSTALL_DIR=/$WORKDIR/zephyr-sdk
+ENV ZEPHYR_BASE=/$WORKDIR/zephyr
 ENV PATH="${ZEPHYR_BASE}/scripts:${PATH}"
