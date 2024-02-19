@@ -1,7 +1,7 @@
 
 FROM python:alpine3.19
 
-ARG USER=zephyr
+ARG USER=user
 ARG WORKDIR=workspaces
 ARG HOST_ARCH=x86_64
 ARG TARGET=stm32
@@ -11,10 +11,8 @@ ARG ZSDK_VERSION=0.16.1
 
 # Install base packages
 RUN apk add --update --no-cache \
-	bash \
-	sudo \
-	build-base \
-	pkgconfig cmake git \
+	bash sudo \
+	build-base pkgconfig cmake git \
 	cairo-dev cairo cairo-tools \
 	gobject-introspection-dev \
 	rust cargo
@@ -61,31 +59,31 @@ RUN mkdir -p /opt/toolchains && \
     # run it
     #./zephyr-sdk-${HOSTTYPE}-hosttools-standalone-0.9.sh
 
-
 # Run the Zephyr SDK setup script as 'user' in order to ensure that the
 # `Zephyr-sdk` CMake package is located in the package registry under the
 # user's home directory.
-USER $USER
+USER ${USER}
 
 #RUN sudo -E -- /bin/sh -c \
 #	'/opt/toolchains/zephyr-sdk-${ZSDK_VERSION}/setup.sh -c && \
 #	chown -R $USER:$USER /home/$USER/.cmake'
-RUN sudo /opt/toolchains/zephyr-sdk-${ZSDK_VERSION}/setup.sh -c 
+RUN sudo /opt/toolchains/zephyr-sdk-${ZSDK_VERSION}/setup.sh -c && \
+	sudo chown -R ${USER}:${USER} /home/${USER}/.cmake
+
+WORKDIR /${WORKDIR}
 
 RUN \
 	west init -m https://github.com/cooked/vscode-zephyr-template --mf .manifests/west-${TARGET}.yml && \
     west update && \
     python3 -m pip install -r zephyr/scripts/requirements.txt
-	
-WORKDIR /$WORKDIR
 
 # Set the locale
 ENV PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig
 ENV OVMF_FD_PATH=/usr/share/ovmf/OVMF.fd
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
-ENV XDG_CACHE_HOME=/$WORKDIR/.cache
+ENV XDG_CACHE_HOME=/${WORKDIR}/.cache
 ENV ZEPHYR_TOOLCHAIN_VARIANT=zephyr
-ENV ZEPHYR_SDK_INSTALL_DIR=/$WORKDIR/zephyr-sdk
-ENV ZEPHYR_BASE=/$WORKDIR/zephyr
+ENV ZEPHYR_SDK_INSTALL_DIR=/${WORKDIR}/zephyr-sdk
+ENV ZEPHYR_BASE=/${WORKDIR}/zephyr
 ENV PATH="${ZEPHYR_BASE}/scripts:${PATH}"
