@@ -19,10 +19,10 @@
     "build": {
         "args": {
             "WORKDIR" : "workspaces",
-            "TARGET" : "stm32",
-            "TOOLCHAIN" : "arm-zephyr-eabi",
-            "ZSDK_VERSION" : "0.16.1",
-            "ZEPHYR_VERSION" : "3.3.0"
+            "TARGET" : "espressif",
+            "TOOLCHAIN" : "riscv64-zephyr-elf",
+            "ZSDK_VERSION" : "0.16.6",
+            "ZEPHYR_VERSION" : "3.6.0"
         }
     },
 
@@ -46,11 +46,16 @@
                 // core
                 "ms-vscode.cmake-tools",
                 "ms-azuretools.vscode-docker",
-                // zephyr
-                "circuitdojo.zephyr-tools",
+                // Zephyr IDE
+                "mylonics.zephyr-ide",
+                // Embedded Tools
+                "dan-c-underwood.arm",
+                "ms-vscode.vscode-embedded-tools",
+                "ms-vscode.vscode-serial-monitor",
                 // editing
                 "stkb.rewrap",
-                "wayou.vscode-todo-highlight"
+                "wayou.vscode-todo-highlight",
+                "redhat.vscode-yaml"
             ]
         }
     } 
