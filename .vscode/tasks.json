@@ -12,7 +12,7 @@
 			"args": [
 				"build",
 				"-p", "always",
-				"-b", "nucleo_f446ze",
+				"-b", "esp32c3_devkitm",
 				"/workspaces/zephyr/samples/basic/blinky"
 			]
 		},

@@ -7,7 +7,7 @@ on:
         type: choice
         description: 'Enter the target of development'
         required: true
-        default: 'stm32'
+        default: 'esp32'
         options:
           - 'stm32'
           - 'esp32'
